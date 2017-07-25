@@ -1,0 +1,450 @@
+Steps for Bicycle Marketplace:
+> mkdir bicycle-marketplace  (then cd into the folder)
+> touch server.js
+> mkdir server
+> mkdir server/config
+> mkdir server/controllers
+> mkdir server/models
+> npm install -y
+> npm install --save express
+> npm install --save mongoose
+> npm install --save body-parser
+> npm install --save express-session
+> npm install --save bcryptjs
+> atom .    (open up in your web browser)
+> pwd (to get a copy of where you are at in your directory)
+open up three other terminal tabs
+in a new terminal tab, paste the directory path from the pwd
+> cd (pwd=the path to your file)
+now go back to your text editor where your project is and go to server.js:
+let express = require('express');
+let bp = require('body-parser');
+let session = require('express-session');
+
+let app = express();
+app.use(session({
+  secret: 'mysecretestsecret',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {}
+}))
+app.user(bp.json());
+
+app.listen(8000, function(){
+  console.log('listening on port 8000')
+})
+
+
+now create mongoose.js file under the server/config path:
+let mongoose = require('mongoose');
+let fs = require('fs');
+mongoose.Promise = global.Promise;
+
+mongoose.connect('mongodb://localhost/bicycle_marketplace12047', {useMongoClient: true});
+
+let models_path = __dirname + '/../models';
+
+fs.readdirSync(models_path).forEach(function(file){
+  if(file.includes('.js')){
+    console.log(`loading ${file}...`)
+    require(`${models_path}/${file}`);
+  }
+})
+
+
+now go back to server.js:
+require('./server/config/mongoose');
+
+
+now start your server in one your terminal tabs:
+> nodemon server
+
+go to text editor, under server/models, create a file named user.js:
+let mongoose = require('mongoose');
+let UserSchema = new mongoose.Schema({
+  name:{
+    type: String,
+    required: [true, 'Name cannot be blank']
+  },
+  email: {
+    type: String,
+    required: [true, 'Email cannot be blank'],
+    unique: [true, 'Email is already registered']
+  },
+  password: {
+    type: String,
+    required: [true, 'Password cannot be blank']
+  }
+  bikes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Bike'
+  }]
+}, {timestamps: true});
+
+mongoose.model('User', UserSchema);
+
+
+now under server/models, create a file named bike.js:
+let mongoose = require('mongoose');
+let BikeSchema = new mongoose.Schema({
+  title:{
+    type: String,
+    required: [true, 'Title cannot be blank']
+  },
+  description: {
+    type: String,
+    required: [true, 'Description cannot be blank'],
+    maxlength: [200, 'Cannot exceed 200 characters']
+  },
+  location: {
+    type: String,
+    required: [true, 'Location cannot be blank']
+  },
+  price: {
+    type: Number,
+    min: [1, 'Price must be at least $1']
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref : 'User'
+  }
+}, {timestamps: true});
+
+mongoose.model('Bike', BikeSchema);
+
+
+now go to text editor, under the server/controllers create a users.js:
+let mongoose = require('mongoose');
+let User = mongoose.model('User');
+
+module.exports= {
+  session: function(req, res){
+    if(req.session.iser_id){
+      return res.json({
+        status: true,
+        user_id: req.session.user_id
+      })
+    }
+    return res.json({ status: false})
+  },
+  index: function(req, res){
+    User.find({}, function(err, users){
+      if (err){
+        return res.json(err);
+      }
+      return res.json(users);
+    })
+  },
+  create: function(req, res){
+    User. create(req.body, function(err, user){
+      if(err){
+        return res.json(err);
+      }
+      req.session.user_id = user._id;
+      return res.json(user);
+    })
+  },
+  show: function(req, res){
+    User.findById(req.params.id, function(err, user){
+      if(err){
+        return res.json(err);
+      }
+      return res.json(user);
+    })
+  },
+  authenticate: function(req, res){
+    User.findOne({ email: req.body.email}, function(err, user){
+      if(err){
+        return res.json(err);
+      }
+      if(user && user.authenticate(req.body.password)){
+        req.session.user_id = user._id;
+        return res.json(user);
+      }
+      return res.json({
+        errors: {
+          login:{
+            message: 'Invalid credentials'
+          }
+        }
+      })
+    })
+  },
+  logout: function(req, res){
+    if(req.session.user_id){
+      delete req.session.user_id
+    }
+    return res.json({status: true})
+  }
+}
+
+
+now go back to your user.js file in the server/models and add:
+UserSchema.pre('save', function(next){
+  this.password = bcrypt.hashSync(this.password, bcrypt.genSaltSync(10));
+  next();
+})
+UserSchema.methods.authenticate = function(password){
+  return bcrypt.compareSync(password, this.password);
+}
+
+
+now go to server/config, and create routes.js and add:
+let path = require('path');
+let Users = require('./../controllers/users');
+let Bikes = require('./../controllers/bikes');
+
+module.exports = function(app){
+  app.get('/users', Users.index);
+  app.post('/users', Users.create);
+  app.get('/users/:id', Users.show);
+  app.delete('/users/:id', Users.logout);
+
+  app.get('/session', Users.session);
+  app.post('/session', Users.authenticate);
+
+  app.get('/bikes', Bikes.index);
+  app.post('/bikes', Bikes.create);
+  app.patch('/bikes/:id', Bikes.update);
+  app.delete('/bikes/:id', Bikes.destroy);
+}
+
+add routes connection under the mongoose connection in server.js:
+require('./server/config/routes')(app);
+
+
+under the server/controllers create a bikes.js and add:
+let mongoose = require('mongoose');
+let Bike = mongoose.model('Bike');
+
+module.exports= {
+  index: function(req, res){
+    Bike.find({}, function(err, bikes){
+      if(err){
+        return res.json(err);
+      }
+      return res.json(bikes);
+    })
+  },
+  create: function(req, res){
+    Bike.create(req.body, function(err, bike){
+      if(err){
+        return res.json(err);
+      }
+      User.findByIdAndUpdate(req.body.user, { $push: {bikes: bike_id}}, {new:true}, function(err, user){
+        if(err){
+          return res.json(err);
+        }
+        return res.json(bike);
+      })
+    })
+  },
+  update: function(req, res){
+    Bike.findByIdAndUpdate(req.params.id, {$set: req.body}, {new: true}, function(err, bike){
+      if(err){
+        return res.json(err);
+      }
+      return res.json(bike);
+    })
+  },
+  destroy: function(req, res){
+    Bike. findByIdAndRemove( req.params.id, function(err, bike){
+      if(err){
+        return res.json(err);
+      }
+      return res.json(bike);
+    })
+  }
+}
+
+add a public folder(previously made angular app file), enter in terminal:
+
+> cd public
+> ng build
+> ng build -w
+
+go into server.js file, add:
+app.user(express.static(__dirname + '/public/dist'));
+
+go into routes.js file, add:
+app.all('*', function(req, res, next){
+  res.sendFile(path.resolve('./public/dist/index.html'))
+})
+
+go into app.module.ts, add:
+import {HttpModule} from '@angular/http';
+import {FormsModule} from '@angular/forms';
+
+add under the @NgModule({, imports:
+HttpModule,
+FormsModule
+
+then go into app in your terminal:
+> cd public/src/app
+> ng g c header
+
+then go back to the text editor, app.module.ts:
+erase the /src/app in the import HeaderComponent line
+
+then go to the app.component.html:
+<app-header></app-header>
+
+go to header.component.html:
+<h1>Bicycle Marketplace</h1>
+
+go back to terminal:
+> ng g c login
+
+go to login folder, app.module.ts:
+import {LogInComponent} from './login/login.component';
+
+go to app.component.html:
+<app-login (createUserEvent)="propagateUser($event)"></app-login>
+
+go to login.component.html:
+<div>
+  <h3>LogIn</h3>
+  <form (submit)="login(); loginForm.reset()" #loginForm="ngForm">
+    <div>
+      <label>Email</label>
+      <input type="text" name="email" [(ngModel)]="loginUser.email">
+    </div>
+    <div>
+      <label>Password</label>
+      <input type="password" name="password" [(ngModel)]="loginUser.password">
+    </div
+    <input type="submit" value="Login">
+  </form>
+  <p [ngStyle]="{'color'='red'}" *ngFor="let error of loginErrors">{{ error}}</p>
+</div>
+<div>
+  <h3>Register</h3>
+  <form (submit)="createUser(newUser); registerForm.reset()" #registerForm="ngForm">
+    <div>
+      <label>Name</label>
+      <input type="text" name="name" [(ngModel)]="newUser.name">
+    </div>
+    <div>
+      <label>Email</label>
+      <input type="text" name="email" [(ngModel)]="newUser.email">
+    </div>
+    <div>
+      <label>Password</label>
+      <input type="password" name="password" [(ngModel)]="newUser.password">
+    </div>
+    <div>
+      <label>Password Confirmation</label>
+      <input type="password" name="password_confirmation" [(ngModel)]="newUser.password_confirmation">
+    </div>
+    <input> type="submit" value="Register">
+    <p [ngStyle]="{'color'='red'}" *ngFor="let error of registrationErrors">{{ error}}</p>
+  </form>
+</div>
+
+go to login.component.ts file:
+under loginUser = {};
+newUser = {};
+registrationErrors = [];
+loginErrors = [];
+
+go to terminal:
+> ng g s User
+
+go to app.module.ts:
+//Services
+import {UserService} from './user.service';
+
+then on the same file under providers:
+providers: [UserService],
+
+go to app.component.ts:
+import {UserService} from './user.service';
+
+under export class AppComponent:
+title = 'app';
+current_user = {};
+
+constructor(private _userService: UserService){}
+
+  propagateUser(user
+    console.log('in the app component');
+    this.current_user = user;
+  }
+
+go to login.component.ts, add in the import{Component, OnInIt}:
+{Output, EventEmitter}
+import {UserService} from '../user.service';
+
+then under export class LoginComponent:
+@Output() createUserEvent = new EventEmitter;
+
+then under constructor(){}:
+constructor(private _userService: UserService)
+
+propagateUser(newUser){
+  console.log('in the app component')
+  this.createUserEvent.emit(newUser)
+}
+login(loginUser){
+  return this._userService.authenticate(loginUser)
+  .then(data => {
+    if(data.errors){
+      for(let key in data.errors){
+        let error = data.errors[key];
+        this.loginErrors.push(error.message);
+      }
+    } else{
+      this.propagateUser(data);
+    }
+  })
+  .catch(err => {console.log(err)})
+}
+createUser(newUser){
+  console.log('in app component');
+  console.log(newUser);
+  return this._userService.create(newUser)
+  .then(user => {
+    console.log(user)
+    if(user.errors){
+      for(let key in user.errors){
+        let error = user.errors[key];
+        this.registrationErrors.push(error.message);
+      }
+    } else{
+      this.propagateUser(user);
+    }
+  })
+  .catch(err => {console.log(err) })
+}
+
+go to user.service.ts:
+import {Http} from '@angular/http';
+import 'rxjs';
+
+  constructor(private _http: Http) {}
+
+  create(newUser){
+    return this._http.post('/users', newUser).map(data => data.json()).toPromise();
+  }
+  authenticate(loginUser){
+    console.log(loginUser)
+    return this._http.post('/session', loginUser).map(data => data.json()).toPromise();
+  }
+
+NOW DO SOMETHING WITH THE BIKES
+go to terminal:
+touch app-routing.module.ts
+
+go to app-routing.module.ts:
+import { NgModule } from '@angular/core';
+import { Routes, RouterModule } from '@angular/router';
+const routes: Routes = [
+
+];
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+
+end video time at 1:35:20
