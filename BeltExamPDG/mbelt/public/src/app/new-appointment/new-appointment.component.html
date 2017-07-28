@@ -1,0 +1,27 @@
+
+<div>
+  <h1>New Appointment</h1>
+</div>
+<div>
+  <form (submit)="createAppointment()">
+    <label>Date</label>
+    <input type="date" name="date">
+    <label>Time</label>
+    <select name="time">
+      <option value="8am">8:00 AM</option>
+      <option value="9am">9:00 AM</option>
+      <option value="10am">10:00 AM</option>
+      <option value="11am">11:00 AM</option>
+      <option value="12pm">12:00 PM</option>
+      <option value="1pm">1:00 PM</option>
+      <option value="2pm">2:00 PM</option>
+      <option value="3pm">3:00 PM</option>
+      <option value="4pm">4:00 PM</option>
+      <option value="5pm">5:00 PM</option>
+    </select>
+    <label>Complaint</label>
+    <textarea name="complaint" [(ngModel)]="newAppointment.complaint" rows="5"></textarea>
+    <!-- <button [routerlink]="['/dashboard']">Cancel</button> -->
+    <button type="submit">Add Appointment</button>
+  </form>
+</div>

@@ -1,0 +1,26 @@
+<div>
+  <h1 class="header_name">Hi {{ currentUser.name }}</h1>
+  <a class="float_right" href (click)="logout()">Logout</a>
+</div>
+<div>
+  <table>
+    <tr>
+      <th>Date</th>
+      <th>Time</th>
+      <th>Patient Name</th>
+      <th>Complaint</th>
+    </tr>
+    <tr *ngFor="let appointment of appointments">
+      <td>{{ appointment.createdAt }}</td>
+      <td>{{ appointment.createdAt }}</td>
+      <td>{{ appointment.user.name }}</td>
+      <td>
+        {{ appointment.complaint }}
+
+      </td>
+    </tr>
+  </table>
+</div>
+<div>
+  <a href [routerLink]="['/new-appointment']">Add a new Appointment</a>
+</div>
