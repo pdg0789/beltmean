@@ -1,0 +1,30 @@
+<div class="container-fluid">
+   <a href="/ideas" data-method="delete">Bright Ideas</a>
+   <a href="/logout" data-method="delete">Logout</a>
+     <div class="container">
+         <a href="/users/<%= @idea.user.id %>"><%= @idea.user.alias %></a> says:
+         <div>
+             <%= @idea.content %>
+         </div>
+     </div>
+         <hr>
+     <div class="container">
+         <p>People who liked this post:</p>
+         <table class="table">
+             <thead>
+                 <tr>
+                     <th>Alias</th>
+                     <th>Name</th>
+                 </tr>
+             </thead>
+             <tbody>
+                 <% @users.each do |user| %>
+                   <tr>
+                     <td><a href="/users/<%= user.id %>"><%= user.alias %></a></td>
+                     <td><%= user.name %></td>
+                   </tr>
+                 <% end %>
+             </tbody>
+         </table>
+     </div>
+ </div>
